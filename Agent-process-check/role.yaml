@@ -1,0 +1,10 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  # The role is created within the "agents" namespace
+  namespace: agents
+  name: secret-access-role #This will have permissions of get,list and watch secrets within agents ns, as given below
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]

@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <server-name>
+  namespace: <ns>
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: <label> 
+  template:
+    metadata:
+      labels:
+        app: <label> #will be considered as selector that matches pod labels, which helps in Autohealing capability!
+    spec: 
+      serviceAccountName: default
+      containers:
+      - name: jobmanager-checker
+        image: alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            apk add --no-cache curl bash openssh procps sshpass && \
+            PASSWORD="$SECRET_PASSWORD" && \
+           
+            while true; do
+              # Check if SSH connection is working
+              sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname>  "true"
+              if [ $? -ne 0 ]; then
+                echo "SSH connection failed. Exiting pod."
+                exit 1
+              fi
+             
+              # Check if process is running
+              if sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname> "ps -ef | grep -v grep | grep '<process>'" > /dev/null; then
+                echo "Agent process is up already."
+              else
+                echo " process is not running. Executing shutdown and startup scripts."
+                sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname> '/path/to/shutdown' && \
+                sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname> '/path/to/startup'
+              fi
+             
+              # Check error logs - Retry up to 3 times if error persists
+              retry_count=0
+              max_retries=3
+              while [ $retry_count -lt $max_retries ]; do
+                last_log=$(sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname> "tail -n 1 /path/to/agent.log")
+               
+                if echo "$last_log" | grep -q "ERROR"; then
+                  echo "Found this error in logs: $last_log"
+                  echo "Executing shutdown and startup scripts to recover..."
+                  sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname> '/path/to/shutdown' && \
+                  sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no <user@serverip or hostname> '/path/to/startup'
+                  retry_count=$((retry_count + 1))
+                  sleep 120  # Wait 2 minutes before next check
+                else
+                  echo "No error found in logs. Agent is running fine from log last line message."
+                  break
+                fi
+              done
+             
+              # If the error persists after 3 retries, escalate
+              if [ $retry_count -eq $max_retries ]; then
+                echo "Error found in agent logs even after $max_retries attempts. Possible server or machine issue. Escalate to Server team."
+              fi
+             
+              sleep 300  # Wait 5 minutes before the next check
+            done
+        env:
+        - name: SECRET_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: user
+              key: password  # The key in the secret containing the password
