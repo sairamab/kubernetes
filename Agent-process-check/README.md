@@ -25,20 +25,30 @@ Here comes the usage of k8s resources- "service account", "roles" and "rolebindi
  A RoleBinding attaches a Role to a ServiceAccount within a specific namespace. ClusterRoleBinding attaches a ClusterRole to a      ServiceAccount across all namespaces.
 
   🛠 How They Work Together?
+  
   1️⃣ A pod runs with a ServiceAccount.
+  
   2️⃣ The ServiceAccount needs permissions to perform actions (e.g., list pods).
+  
   3️⃣ A Role defines the needed permissions within a namespace.
+  
   4️⃣ A RoleBinding links the Role to the ServiceAccount.
 
-secret creation:
+**secret creation**:
  secret can be created declarative(using yaml files like we did for role, rolebinding and deployment as above) way as well as imperative way(we shall use this for creating secret now which store password of a user)
 
-kubectl create secret <type> <secret-name> --from-literal=<key>=<value> --namespace=<namespace>
-Secret Type	              Description
-generic	                  Used for storing any kind of secret data (default type).
-docker-registry	          Used for storing Docker credentials.
-tls	Stores                TLS certificates and keys.
-basic-auth	              Stores username-password credentials.
+_kubectl create secret secret-type secret-name --from-literal=key=value --namespace=namespace_  
+
+Secret Type	        :     Description
+
+  generic	             :     Used for storing any kind of secret data (default type).
+
+  docker-registry	     :    Used for storing Docker credentials.
+
+  tls	Stores            :    TLS certificates and keys.
+
+  basic-auth	           :    Stores username-password credentials.
+
 
 we used generic type in this project
 **kubectl create secret generic my-secret --from-literal=username=user --from-literal=password=xxxxxxx**
